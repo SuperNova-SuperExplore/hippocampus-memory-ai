@@ -78,10 +78,10 @@ async function main(): Promise<void> {
 
   server.tool(
     "hippocampus_remember",
-    "Store a memory with optional structured detail atoms (files, functions, configs, etc). Transaction-safe with auto-retry and fallback.",
+    "Store a memory with optional structured detail atoms (files, functions, configs, etc). Transaction-safe with auto-retry and fallback. IMPORTANT: Always pass your Conversation ID (from user_information metadata) as session_id for proper per-session memory binding.",
     {
       content: z.string().describe("The memory content to store"),
-      session_id: z.string().optional().describe("Session/conversation ID (defaults to current)"),
+      session_id: z.string().optional().describe("Session/conversation ID — ALWAYS pass your Conversation ID from user_information metadata"),
       tags: z.array(z.string()).optional().describe("Tags for categorization"),
       category: z
         .enum(["decision", "finding", "instruction", "code", "error", "architecture", "general"])
@@ -145,7 +145,7 @@ async function main(): Promise<void> {
 
   server.tool(
     "hippocampus_batch_remember",
-    "Store multiple memories in a single call. Each memory is individually transaction-safe. Max 50 per batch.",
+    "Store multiple memories in a single call. Each memory is individually transaction-safe. Max 50 per batch. Always pass session_id (your Conversation ID) for proper session binding.",
     {
       memories: z
         .array(
@@ -188,7 +188,7 @@ async function main(): Promise<void> {
 
   server.tool(
     "hippocampus_checkpoint",
-    "Save a progress checkpoint — like a save-game. Captures topics covered, decisions made, and open questions.",
+    "Save a progress checkpoint — like a save-game. Captures topics covered, decisions made, and open questions. Always pass your Conversation ID as session_id.",
     {
       summary: z.string().describe("Checkpoint summary"),
       session_id: z.string().optional().describe("Session ID (defaults to current)"),

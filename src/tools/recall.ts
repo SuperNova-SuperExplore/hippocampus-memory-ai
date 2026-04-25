@@ -80,19 +80,22 @@ export function recall(db: HippocampusDB, input: RecallInput): RecallResult {
     }
   }
 
-  // Attach details if requested
-  if (includeDetails) {
+  // Batch attach details (eliminates N+1 queries)
+  if (includeDetails && results.length > 0) {
+    const memoryIds = results.map((r) => r.memory.id);
+    const detailMap = batchGetDetails(db, memoryIds);
     for (const r of results) {
-      r.details = getDetailsForMemory(db, r.memory.id);
+      r.details = detailMap.get(r.memory.id) || [];
     }
   }
 
-  // Attach session titles
-  for (const r of results) {
-    const session = db.db
-      .prepare("SELECT title FROM sessions WHERE id = ?")
-      .get(r.memory.session_id) as { title: string | null } | undefined;
-    r.session_title = session?.title ?? undefined;
+  // Batch attach session titles (eliminates N+1 queries)
+  if (results.length > 0) {
+    const sessionIds = [...new Set(results.map((r) => r.memory.session_id))];
+    const titleMap = batchGetSessionTitles(db, sessionIds);
+    for (const r of results) {
+      r.session_title = titleMap.get(r.memory.session_id) ?? undefined;
+    }
   }
 
   db.logOperation("recall", "success", undefined, Date.now() - startTime);
@@ -275,4 +278,59 @@ export function getDetailsForMemory(db: HippocampusDB, memoryId: number): Detail
   return db.db
     .prepare("SELECT * FROM memory_details WHERE memory_id = ? ORDER BY detail_type, id")
     .all(memoryId) as DetailRecord[];
+}
+
+/**
+ * Batch fetch details for multiple memories in ONE query
+ */
+function batchGetDetails(db: HippocampusDB, memoryIds: number[]): Map<number, DetailRecord[]> {
+  const map = new Map<number, DetailRecord[]>();
+  if (!memoryIds.length) return map;
+
+  // SQLite has a limit of ~999 variables, chunk if needed
+  const chunks = chunkArray(memoryIds, 500);
+
+  for (const chunk of chunks) {
+    const placeholders = chunk.map(() => "?").join(",");
+    const rows = db.db
+      .prepare(`SELECT * FROM memory_details WHERE memory_id IN (${placeholders}) ORDER BY detail_type, id`)
+      .all(...chunk) as DetailRecord[];
+
+    for (const row of rows) {
+      if (!map.has(row.memory_id)) map.set(row.memory_id, []);
+      map.get(row.memory_id)!.push(row);
+    }
+  }
+
+  return map;
+}
+
+/**
+ * Batch fetch session titles in ONE query
+ */
+function batchGetSessionTitles(db: HippocampusDB, sessionIds: string[]): Map<string, string | null> {
+  const map = new Map<string, string | null>();
+  if (!sessionIds.length) return map;
+
+  const placeholders = sessionIds.map(() => "?").join(",");
+  const rows = db.db
+    .prepare(`SELECT id, title FROM sessions WHERE id IN (${placeholders})`)
+    .all(...sessionIds) as { id: string; title: string | null }[];
+
+  for (const row of rows) {
+    map.set(row.id, row.title);
+  }
+
+  return map;
+}
+
+/**
+ * Split array into chunks of given size
+ */
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
 }
