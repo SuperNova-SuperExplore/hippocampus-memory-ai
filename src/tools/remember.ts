@@ -199,9 +199,16 @@ export function remember(
 
 function checkDuplicate(db: HippocampusDB, sessionId: string, content: string): number | false {
   try {
-    // Use first 100 chars as search key for performance
-    const searchKey = content.substring(0, 100).replace(/['"*()]/g, " ").trim();
-    if (!searchKey) return false;
+    // Extract first 5 significant words (>3 chars) as search key
+    const words = content
+      .replace(/[^a-zA-Z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 3)
+      .slice(0, 5);
+
+    if (words.length < 2) return false;
+
+    const searchKey = words.join(" ");
 
     const results = db.db
       .prepare(
@@ -213,13 +220,13 @@ function checkDuplicate(db: HippocampusDB, sessionId: string, content: string): 
       .all(searchKey, sessionId) as { id: number; content: string }[];
 
     for (const row of results) {
-      // Simple similarity: check if >90% of words overlap
-      const newWords = new Set(content.toLowerCase().split(/\s+/));
-      const oldWords = new Set(row.content.toLowerCase().split(/\s+/));
+      // Simple similarity: check if >85% of words overlap
+      const newWords = new Set(content.toLowerCase().split(/\s+/).filter((w) => w.length > 2));
+      const oldWords = new Set(row.content.toLowerCase().split(/\s+/).filter((w) => w.length > 2));
       const intersection = [...newWords].filter((w) => oldWords.has(w));
       const similarity = intersection.length / Math.max(newWords.size, oldWords.size);
 
-      if (similarity > 0.9) return row.id;
+      if (similarity > 0.85) return row.id;
     }
   } catch {
     // If dedup check fails, proceed with save (better safe than sorry)
