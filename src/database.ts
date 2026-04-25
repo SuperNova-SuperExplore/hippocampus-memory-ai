@@ -152,6 +152,16 @@ export class HippocampusDB {
         timestamp TEXT DEFAULT (datetime('now'))
       );
 
+      -- TABLE 7: Watcher state — Track auto-ingest read positions
+      CREATE TABLE IF NOT EXISTS watcher_state (
+        session_id TEXT PRIMARY KEY,
+        overview_path TEXT NOT NULL,
+        last_byte_offset INTEGER DEFAULT 0,
+        last_step_index INTEGER DEFAULT -1,
+        entries_ingested INTEGER DEFAULT 0,
+        last_processed TEXT DEFAULT (datetime('now'))
+      );
+
       -- Indexes for performance
       CREATE INDEX IF NOT EXISTS idx_memories_session ON memories(session_id);
       CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category);

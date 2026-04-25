@@ -21,6 +21,7 @@ import { timeline } from "./tools/timeline.js";
 import { getContext, linkSessions } from "./tools/context.js";
 import { discoverSessions, renameSession } from "./tools/discover.js";
 import { forget } from "./tools/forget.js";
+import { AutoIngestWatcher } from "./watcher/auto-ingest.js";
 
 const SERVER_NAME = "hippocampus-memory-ai";
 const SERVER_VERSION = "1.0.0";
@@ -365,14 +366,15 @@ async function main(): Promise<void> {
 
   server.tool(
     "hippocampus_health",
-    "Get database health status and statistics.",
+    "Get database health status and statistics. Includes auto-ingest watcher status.",
     {},
     async () => {
       try {
         const healthReport = db.healthCheck();
         const stats = db.getStats();
+        const watcherStats = watcher?.getStats() ?? { active: false, sessions_watched: 0, total_ingested: 0 };
         return {
-          content: [{ type: "text" as const, text: JSON.stringify({ health: healthReport, stats }, null, 2) }],
+          content: [{ type: "text" as const, text: JSON.stringify({ health: healthReport, stats, auto_ingest: watcherStats }, null, 2) }],
         };
       } catch (e) {
         return { content: [{ type: "text" as const, text: `Error: ${e instanceof Error ? e.message : e}` }], isError: true };
@@ -403,21 +405,29 @@ async function main(): Promise<void> {
   // Connect + Start
   // ═══════════════════════════════════════
 
+  // ═══════════════════════════════════════
+  // Auto-Ingest Watcher
+  // ═══════════════════════════════════════
+
+  let watcher: AutoIngestWatcher | null = null;
+  if (BRAIN_PATH) {
+    watcher = new AutoIngestWatcher(db, BRAIN_PATH, 10_000);
+    watcher.start();
+  }
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error(`🧠 ${SERVER_NAME} — Ready. ${db.getStats().memories} memories loaded.`);
+  console.error(`🧠 ${SERVER_NAME} — Ready. ${db.getStats().memories} memories loaded. Watcher: ${watcher ? 'ON' : 'OFF'}`);
 
   // Graceful shutdown
-  process.on("SIGINT", () => {
+  const shutdown = () => {
+    watcher?.stop();
     db.createBackup();
     db.close();
     process.exit(0);
-  });
-  process.on("SIGTERM", () => {
-    db.createBackup();
-    db.close();
-    process.exit(0);
-  });
+  };
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
 }
 
 main().catch((error) => {
