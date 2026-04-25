@@ -1,6 +1,6 @@
 {
   "name": "hippocampus-memory-ai",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "🧠 Persistent Session Memory MCP Server for AI — Converts short-term context window into long-term searchable memory",
   "main": "dist/index.js",
   "bin": {

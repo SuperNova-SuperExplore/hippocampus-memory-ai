@@ -24,7 +24,7 @@ import { forget } from "./tools/forget.js";
 import { AutoIngestWatcher } from "./watcher/auto-ingest.js";
 
 const SERVER_NAME = "hippocampus-memory-ai";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.1.0";
 
 // ═══════════════════════════════════════
 // Environment Configuration

@@ -40,10 +40,15 @@ AI assistants forget everything between sessions. They lose context on:
 │  └─────────────────┘  └──────────────────────────────┘      │
 │                                                              │
 │  ┌─────────────────┐  ┌──────────────────────────────┐      │
-│  │  Detail Atoms    │  │  Fallback Safety Net         │      │
-│  │  (file, func,    │  │  (JSONL append-only backup)  │      │
-│  │   config, cmd)   │  │                              │      │
+│  │  Detail Atoms    │  │  Auto-Ingest Watcher         │      │
+│  │  (file, func,    │  │  (monitors overview.txt →    │      │
+│  │   config, cmd)   │  │   auto-stores memories)      │      │
 │  └─────────────────┘  └──────────────────────────────┘      │
+│                                                              │
+│  ┌─────────────────┐                                        │
+│  │  Fallback Safety │                                        │
+│  │  (JSONL backup)  │                                        │
+│  └─────────────────┘                                        │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -57,6 +62,7 @@ AI assistants forget everything between sessions. They lose context on:
 - 🛡️ **Zero Data Loss** — Transaction atomicity + JSONL fallback safety net
 - 🔄 **Auto-Backup** — Automatic database backups every 100 writes or 24 hours
 - 📊 **Health Monitoring** — 7-point health check on every startup
+- 🤖 **Auto-Ingest** — Background watcher monitors conversation logs and auto-stores memories without AI involvement
 
 ---
 
@@ -251,9 +257,36 @@ Rebuild FTS5 search indexes. Use if search results seem stale.
 
 ### `hippocampus_health`
 
-Get database health status with 7-point diagnostic check.
+Get database health status with 7-point diagnostic check + auto-ingest watcher status.
 
 ---
+
+## Auto-Ingest Watcher
+
+The server includes a **background filesystem watcher** that automatically captures conversation activity — no AI action required.
+
+### How It Works
+
+1. Every 10 seconds, the watcher scans for recently modified `overview.txt` files in the brain directory
+2. New JSONL entries are parsed and classified
+3. User requests are stored as high-priority `instruction` memories
+4. Tool usage is stored as `code` memories with detail atoms
+5. Session ID is auto-detected from the directory name (UUID)
+
+### What Gets Auto-Captured
+
+| Entry Type | Stored As | Priority |
+|------------|-----------|----------|
+| User requests | `instruction` memory | 4 (high) |
+| Tool calls | `code` memory + details | 2 |
+| Short/error responses | ❌ Skipped | — |
+| Hippocampus calls | ❌ Skipped (loop prevention) | — |
+
+### Requirements
+
+- `BRAIN_PATH` environment variable must be set to the AI's brain directory
+- The brain directory must contain session subdirectories with `overview.txt` files
+- The watcher starts automatically on server boot and stops on shutdown
 
 ## Architecture
 
@@ -276,6 +309,7 @@ sessions (from)   N ←→ N  sessions (to)    via cross_refs
 | **Graph** | `cross_refs` | Inter-session relationships |
 | **Index** | `memories_fts`, `details_fts` | Full-text search (FTS5) |
 | **Ops** | `ops_log` | Operation tracking |
+| **Watcher** | `watcher_state` | Auto-ingest file tracking |
 
 ### Safety Guarantees
 
