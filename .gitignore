@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+hippocampus_fallback.jsonl
+hippocampus.backup.db
+.env
