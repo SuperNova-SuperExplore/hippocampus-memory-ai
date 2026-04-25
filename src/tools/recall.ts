@@ -216,8 +216,10 @@ function likeSearch(
 
   // Each word must appear in content OR tags
   for (const word of words) {
-    sql += " AND (content LIKE ? OR tags LIKE ?)";
-    params.push(`%${word}%`, `%${word}%`);
+    // Escape LIKE wildcards
+    const escaped = word.replace(/%/g, "\\%").replace(/_/g, "\\_");
+    sql += " AND (content LIKE ? ESCAPE '\\' OR tags LIKE ? ESCAPE '\\')";
+    params.push(`%${escaped}%`, `%${escaped}%`);
   }
 
   if (input.session_id) {

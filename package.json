@@ -3,6 +3,14 @@
   "version": "1.0.0",
   "description": "🧠 Persistent Session Memory MCP Server for AI — Converts short-term context window into long-term searchable memory",
   "main": "dist/index.js",
+  "bin": {
+    "hippocampus": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "type": "module",
   "scripts": {
     "build": "tsc",

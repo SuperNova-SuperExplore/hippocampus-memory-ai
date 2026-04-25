@@ -389,22 +389,39 @@ export class HippocampusDB {
   // ═══════════════════════════════════════
 
   rebuildFTSIndex(): { memoriesFts: string; detailsFts: string } {
+    let memStatus = "rebuilt";
+    let detStatus = "rebuilt";
+
     try {
       this.db.exec("INSERT INTO memories_fts(memories_fts) VALUES('rebuild')");
     } catch {
-      // If rebuild fails, recreate
-      this.db.exec("DROP TABLE IF EXISTS memories_fts");
-      this.initFTS();
+      memStatus = "recreated";
     }
 
     try {
       this.db.exec("INSERT INTO details_fts(details_fts) VALUES('rebuild')");
     } catch {
-      this.db.exec("DROP TABLE IF EXISTS details_fts");
-      this.initFTS();
+      detStatus = "recreated";
     }
 
-    return { memoriesFts: "rebuilt", detailsFts: "rebuilt" };
+    // If either failed, drop both and recreate from scratch
+    if (memStatus === "recreated" || detStatus === "recreated") {
+      this.db.exec(`
+        DROP TABLE IF EXISTS memories_fts;
+        DROP TABLE IF EXISTS details_fts;
+        DROP TRIGGER IF EXISTS memories_fts_ai;
+        DROP TRIGGER IF EXISTS memories_fts_ad;
+        DROP TRIGGER IF EXISTS memories_fts_au;
+        DROP TRIGGER IF EXISTS details_fts_ai;
+        DROP TRIGGER IF EXISTS details_fts_ad;
+        DROP TRIGGER IF EXISTS details_fts_au;
+      `);
+      this.initFTS();
+      memStatus = "recreated";
+      detStatus = "recreated";
+    }
+
+    return { memoriesFts: memStatus, detailsFts: detStatus };
   }
 
   // ═══════════════════════════════════════

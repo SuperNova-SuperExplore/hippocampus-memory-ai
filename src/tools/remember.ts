@@ -10,12 +10,9 @@ import { HippocampusDB } from "../database.js";
 import { FallbackWriter } from "../safeguards/fallback.js";
 import type {
   DetailAtom,
-  MemoryCategory,
   RememberResult,
-  VALID_CATEGORIES,
-  VALID_DETAIL_TYPES,
-  MAX_CONTENT_LENGTH,
 } from "../types.js";
+import { MAX_CONTENT_LENGTH, VALID_DETAIL_TYPES } from "../types.js";
 
 // ═══════════════════════════════════════
 // Input Validation
@@ -53,8 +50,8 @@ function validateContent(content: unknown): string {
     throw new Error("Content is required and cannot be empty");
   }
   const trimmed = content.trim();
-  if (trimmed.length > 10_000) {
-    return trimmed.substring(0, 10_000) + "\n[TRUNCATED — original length: " + trimmed.length + " chars]";
+  if (trimmed.length > MAX_CONTENT_LENGTH) {
+    return trimmed.substring(0, MAX_CONTENT_LENGTH) + "\n[TRUNCATED — original length: " + trimmed.length + " chars]";
   }
   return trimmed;
 }
@@ -142,8 +139,7 @@ export function remember(
       for (const detail of details) {
         if (!detail.type) continue;
 
-        const validTypes = ["file", "function", "dependency", "config", "command", "value", "error", "endpoint", "schema", "reference"];
-        if (!validTypes.includes(detail.type)) continue;
+        if (!VALID_DETAIL_TYPES.includes(detail.type)) continue;
 
         const detResult = detailStmt.run(
           memoryId,
@@ -204,7 +200,8 @@ export function remember(
 function checkDuplicate(db: HippocampusDB, sessionId: string, content: string): number | false {
   try {
     // Use first 100 chars as search key for performance
-    const searchKey = content.substring(0, 100).replace(/['"*()]/g, " ");
+    const searchKey = content.substring(0, 100).replace(/['"*()]/g, " ").trim();
+    if (!searchKey) return false;
 
     const results = db.db
       .prepare(
